@@ -19,6 +19,27 @@ def remove_singleton_words(list_of_lines: list[list[str]]):
     return out_lines
 
 
+def get_top_cosine_similarities(target_word: str, word2vec_results: pd.DataFrame, corpus_words: list[str], num_display=10):
+    """
+    :param target_word: Name of the word (whose vector representation is stored in word2vec_results) to analyze cosine
+    similarity against the other words in corpus
+    :param word2vec_results: DataFrame storing vector representations of the words in corpus
+    :param corpus_words: The words in corpus with index order equal to their entry order as vectors in word2vec output
+    :param num_display: (Optional) Total number of words to output having the greatest magnitude of cosine similarity to target_word
+    :return: Series with num_display words having the greatest magnitude of cosine similarity to target_word along with
+     target_word itself
+    """
+    cos_scores = {}
+    for word in corpus_words:
+        cos_scores[word] = cosine_similarity(word2vec_results[target_word], word2vec_results[word])
+    cos_results_s = pd.Series(data=cos_scores)
+    num_display = num_display // 2
+    _out_s = cos_results_s.sort_values(ascending=False).head(num_display+1)
+    _out_s = pd.concat([_out_s, cos_results_s.sort_values().head(num_display)])
+
+    return _out_s
+
+
 def cosine_similarity(a, b):
     numerator = np.dot(a, b)
     denominator = np.linalg.norm(a) * np.linalg.norm(b)
@@ -49,14 +70,8 @@ processed_lines = [
 corpus = corpora.Dictionary.load(f'{root_dir}/NLP/src/dbrooks_part_one.dict')
 model = Word2Vec(sentences=processed_lines, vector_size=100, window=5, min_count=1, workers=6)
 
-word_count_d = corpus.token2id
+word_count_s = pd.Series(corpus.token2id)
 word_idx_list = model.wv.index_to_key
 model_training_results = pd.DataFrame(model.wv.vectors.T, columns=word_idx_list)
 
-focus_word = 'lefties'
-cos_scores = {}
-for word in word_idx_list:
-    cos_scores[word] = cosine_similarity(model_training_results[focus_word], model_training_results[word])
-cos_results_s = pd.Series(data=cos_scores)
-print(cos_results_s.sort_values(ascending=False).head())
-print(cos_results_s.sort_values().head())
+print(get_top_cosine_similarities('lefties', model_training_results, word_idx_list))
